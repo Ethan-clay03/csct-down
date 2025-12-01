@@ -92,7 +92,6 @@ class CSCTStatus {
     this.downtimeCount = document.getElementById('downtime-count');
     this.downtimeSection = document.getElementById('downtime-incidents');
     this.incidentsList = document.getElementById('incidents-list');
-    this.refreshBtn = document.getElementById('refresh-btn');
     
     // Store status data in localStorage for persistence
     this.storageKey = 'csct-status-data';
@@ -104,8 +103,8 @@ class CSCTStatus {
     // Load initial status from localStorage
     this.loadStoredStatus();
     
-    // Set up refresh button
-    this.refreshBtn.addEventListener('click', () => this.handleRefresh());
+    // Auto-refresh every 3 minutes (180 seconds)
+    setInterval(() => this.loadStatus(), 180000);
     
     // Poll server connectivity every 15 minutes (900000ms) - only once
     setInterval(() => this.checkServerStatus(), 900000);
@@ -378,8 +377,50 @@ class CSCTStatus {
     }
 
     this.statusMeta.innerHTML = `
-      <span>Last check: ${lastChecked}</span>
-      <span>Response: ${latencyText}</span>
+      <span class="metric">Last check: ${lastChecked}</span>
+      <span class="metric">Response: ${latencyText}</span>
+    `;
+  }
+
+  updateTimeDisplay() {
+    // Update the "time ago" display and current streak without full refresh
+    const status = this.getStoredStatus();
+    if (status && status.lastChecked) {
+      const lastChecked = this.formatRelativeTime(new Date(status.lastChecked));
+      const lastCheckSpan = this.statusMeta.querySelector('.metric');
+      if (lastCheckSpan) {
+        lastCheckSpan.textContent = `Last check: ${lastChecked}`;
+      }
+      
+      // Also update the current streak in real-time
+      this.updateCurrentStreakRealTime(status);
+    }
+  }
+
+  updateCurrentStreakRealTime(status) {
+    if (status.totalUpSeconds === 0 && status.totalDownSeconds === 0) {
+      return; // No data yet
+    }
+
+    const now = new Date();
+    const lastStatusChange = status.lastStatusChange ? new Date(status.lastStatusChange) : null;
+    
+    if (!lastStatusChange) return;
+
+    // Calculate real-time streak duration
+    const timeSinceChange = Math.max(0, (now.getTime() - lastStatusChange.getTime()) / 1000);
+    const currentStreakSeconds = timeSinceChange;
+    
+    const totalSeconds = status.totalUpSeconds + status.totalDownSeconds;
+    const uptimePercent = totalSeconds > 0 ? 
+      ((status.totalUpSeconds / totalSeconds) * 100).toFixed(1) : 
+      0;
+
+    const streakText = this.formatDuration(currentStreakSeconds);
+    const currentStatus = status.lastStatus === 'online' ? 'online' : 'offline';
+
+    this.uptimeSummary.innerHTML = `
+      Uptime: ${uptimePercent}% | Current streak: ${streakText} ${currentStatus}
     `;
   }
 
@@ -442,13 +483,31 @@ class CSCTStatus {
     }).join('');
   }
 
-  formatDateTime(date) {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  updateCurrentStreak(status) {
+    if (status.totalUpSeconds === 0 && status.totalDownSeconds === 0) {
+      return; // No data yet
+    }
+
+    const now = new Date();
+    const lastStatusChange = status.lastStatusChange ? new Date(status.lastStatusChange) : null;
+    
+    if (!lastStatusChange) return;
+
+    // Calculate real-time streak duration
+    const timeSinceChange = Math.max(0, (now.getTime() - lastStatusChange.getTime()) / 1000);
+    const currentStreakSeconds = status.currentStreakSeconds + timeSinceChange;
+    
+    const totalSeconds = status.totalUpSeconds + status.totalDownSeconds;
+    const uptimePercent = totalSeconds > 0 ? 
+      ((status.totalUpSeconds / totalSeconds) * 100).toFixed(1) : 
+      0;
+
+    const streakText = this.formatDuration(currentStreakSeconds);
+    const currentStatus = status.lastStatus === 'online' ? 'online' : 'offline';
+
+    this.uptimeSummary.innerHTML = `
+      Uptime: ${uptimePercent}% | Current streak: ${streakText} ${currentStatus}
+    `;
   }
 
   formatRelativeTime(date) {
