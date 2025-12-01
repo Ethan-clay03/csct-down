@@ -5,5 +5,7 @@
   "currentStreakSeconds": 0,
   "totalUpSeconds": 0,
   "totalDownSeconds": 0,
-  "lastChecked": "2025-12-01T16:09:57.573Z"
+  "lastChecked": "2025-12-01T16:09:57.573Z",
+  "downtimeIncidents": [],
+  "totalOutages": 0
 }

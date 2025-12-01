@@ -28,7 +28,9 @@ function readStatusFile() {
       currentStreakSeconds: 0,
       totalUpSeconds: 0,
       totalDownSeconds: 0,
-      lastChecked: null
+      lastChecked: null,
+      downtimeIncidents: [], // Track individual downtime incidents
+      totalOutages: 0 // Count total number of outages
     };
   }
 }
@@ -58,11 +60,37 @@ function computeDurations(prevStatus, now, isOnline) {
   }
 
   const newStatus = isOnline ? 'online' : 'offline';
+  const wasOffline = prevStatus.lastStatus === 'offline';
+  const wasOnline = prevStatus.lastStatus === 'online';
 
   // Status changed: reset streak and timestamp
   if (newStatus !== prevStatus.lastStatus) {
     updated.lastStatus = newStatus;
     updated.lastStatusChange = nowIso;
+    
+    // If coming back online from offline, record the downtime incident
+    if (isOnline && wasOffline && prevStatus.lastStatusChange) {
+      const downtimeStart = new Date(prevStatus.lastStatusChange);
+      const downtimeDuration = Math.max(0, (now.getTime() - downtimeStart.getTime()) / 1000);
+      
+      if (downtimeDuration > 0) {
+        const incident = {
+          startTime: prevStatus.lastStatusChange,
+          endTime: nowIso,
+          duration: Math.round(downtimeDuration),
+          id: Date.now() // Simple ID based on timestamp
+        };
+        
+        // Add to incidents list (keep last 10)
+        updated.downtimeIncidents = [
+          incident,
+          ...(prevStatus.downtimeIncidents || []).slice(0, 9)
+        ];
+        
+        updated.totalOutages = (prevStatus.totalOutages || 0) + 1;
+      }
+    }
+    
     updated.currentStreakSeconds = 0;
   } else {
     updated.currentStreakSeconds =
@@ -72,6 +100,10 @@ function computeDurations(prevStatus, now, isOnline) {
   if (isOnline) {
     updated.lastOnline = nowIso;
   }
+
+  // Ensure arrays exist
+  updated.downtimeIncidents = updated.downtimeIncidents || [];
+  updated.totalOutages = updated.totalOutages || 0;
 
   updated.lastChecked = nowIso;
   return updated;
@@ -125,7 +157,8 @@ async function main() {
     `Last up: ${nextStatus.lastOnline || 'never'} | ` +
       `Current streak: ${nextStatus.currentStreakSeconds.toFixed(0)}s | ` +
       `Total up: ${Math.round(nextStatus.totalUpSeconds)}s | ` +
-      `Total down: ${Math.round(nextStatus.totalDownSeconds)}s`
+      `Total down: ${Math.round(nextStatus.totalDownSeconds)}s | ` +
+      `Outages: ${nextStatus.totalOutages || 0}`
   );
 }
 

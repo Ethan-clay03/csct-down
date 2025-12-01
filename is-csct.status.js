@@ -1,5 +1,86 @@
 // Frontend JavaScript to display CSCT Cloud status
-// Pure client-side implementation for static hosting
+// Pure client-side implementation for static hosting with theme support
+
+class ThemeManager {
+  constructor() {
+    this.storageKey = 'csct-theme-preference';
+    this.init();
+  }
+
+  init() {
+    // Get stored preference or detect system preference
+    const stored = localStorage.getItem(this.storageKey);
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    let theme = stored;
+    if (!theme) {
+      theme = 'system';
+    }
+    
+    this.setTheme(theme);
+    this.setupToggle();
+    
+    // Listen for system theme changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (this.getCurrentTheme() === 'system') {
+        this.applyTheme('system');
+      }
+    });
+  }
+
+  setupToggle() {
+    const toggle = document.getElementById('theme-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', () => this.toggleTheme());
+    }
+  }
+
+  getCurrentTheme() {
+    return localStorage.getItem(this.storageKey) || 'system';
+  }
+
+  setTheme(theme) {
+    localStorage.setItem(this.storageKey, theme);
+    this.applyTheme(theme);
+  }
+
+  applyTheme(theme) {
+    const html = document.documentElement;
+    
+    // Remove any existing theme attribute first
+    html.removeAttribute('data-theme');
+    
+    // Force a reflow to ensure the attribute change is applied
+    html.offsetHeight;
+    
+    if (theme === 'dark') {
+      html.setAttribute('data-theme', 'dark');
+    } else if (theme === 'light') {
+      html.setAttribute('data-theme', 'light');
+    }
+    // For 'system' theme, we leave no attribute (handled by CSS media query)
+  }
+
+  toggleTheme() {
+    const current = this.getCurrentTheme();
+    let next;
+    
+    switch (current) {
+      case 'light':
+        next = 'dark';
+        break;
+      case 'dark':
+        next = 'system';
+        break;
+      case 'system':
+      default:
+        next = 'light';
+    }
+    
+    console.log(`Theme toggle: ${current} → ${next}`); // Debug log
+    this.setTheme(next);
+  }
+}
 
 class CSCTStatus {
   constructor() {
@@ -8,6 +89,9 @@ class CSCTStatus {
     this.statusDetail = document.getElementById('status-detail');
     this.statusMeta = document.getElementById('status-meta');
     this.uptimeSummary = document.getElementById('uptime-summary');
+    this.downtimeCount = document.getElementById('downtime-count');
+    this.downtimeSection = document.getElementById('downtime-incidents');
+    this.incidentsList = document.getElementById('incidents-list');
     this.refreshBtn = document.getElementById('refresh-btn');
     
     // Store status data in localStorage for persistence
@@ -44,7 +128,9 @@ class CSCTStatus {
       currentStreakSeconds: 0,
       totalUpSeconds: 0,
       totalDownSeconds: 0,
-      lastChecked: null
+      lastChecked: null,
+      downtimeIncidents: [], // New: track individual downtime incidents
+      totalOutages: 0 // New: count total number of outages
     };
   }
 
@@ -159,11 +245,37 @@ class CSCTStatus {
     }
 
     const newStatus = isOnline ? 'online' : 'offline';
+    const wasOffline = prevStatus.lastStatus === 'offline';
+    const wasOnline = prevStatus.lastStatus === 'online';
 
     // Status changed: reset streak and timestamp
     if (newStatus !== prevStatus.lastStatus) {
       updated.lastStatus = newStatus;
       updated.lastStatusChange = nowIso;
+      
+      // If coming back online from offline, record the downtime incident
+      if (isOnline && wasOffline && prevStatus.lastStatusChange) {
+        const downtimeStart = new Date(prevStatus.lastStatusChange);
+        const downtimeDuration = Math.max(0, (now.getTime() - downtimeStart.getTime()) / 1000);
+        
+        if (downtimeDuration > 0) {
+          const incident = {
+            startTime: prevStatus.lastStatusChange,
+            endTime: nowIso,
+            duration: Math.round(downtimeDuration),
+            id: Date.now() // Simple ID based on timestamp
+          };
+          
+          // Add to incidents list (keep last 10)
+          updated.downtimeIncidents = [
+            incident,
+            ...(prevStatus.downtimeIncidents || []).slice(0, 9)
+          ];
+          
+          updated.totalOutages = (prevStatus.totalOutages || 0) + 1;
+        }
+      }
+      
       updated.currentStreakSeconds = 0;
     } else {
       updated.currentStreakSeconds =
@@ -173,6 +285,10 @@ class CSCTStatus {
     if (isOnline) {
       updated.lastOnline = nowIso;
     }
+
+    // Ensure arrays exist
+    updated.downtimeIncidents = updated.downtimeIncidents || [];
+    updated.totalOutages = updated.totalOutages || 0;
 
     updated.lastChecked = nowIso;
     return updated;
@@ -197,9 +313,6 @@ class CSCTStatus {
       this.statusTextMain.classList.add('offline');
       this.statusTextMain.textContent = 'CSCT Cloud is offline';
       this.statusDetail.innerHTML = 'Server at <code>https://csctcloud.uwe.ac.uk/</code> is not responding.';
-      if (status.error) {
-        this.statusDetail.innerHTML += ` <em>(${status.error})</em>`;
-      }
     } else {
       this.statusTextMain.textContent = 'Checking status...';
       this.statusDetail.innerHTML = 'Checking server at <code>https://csctcloud.uwe.ac.uk/</code>';
@@ -210,6 +323,9 @@ class CSCTStatus {
 
     // Update uptime summary
     this.updateUptimeSummary(status);
+    
+    // Update downtime incidents
+    this.updateDowntimeIncidents(status);
   }
 
   updateMetaInfo(status) {
@@ -234,7 +350,10 @@ class CSCTStatus {
 
   updateUptimeSummary(status) {
     if (status.totalUpSeconds === 0 && status.totalDownSeconds === 0) {
-      this.uptimeSummary.textContent = 'Click "Re-check now" to begin monitoring.';
+      this.uptimeSummary.textContent = 'Monitoring will begin after first check.';
+      if (this.downtimeCount) {
+        this.downtimeCount.textContent = '';
+      }
       return;
     }
 
@@ -249,6 +368,52 @@ class CSCTStatus {
     this.uptimeSummary.innerHTML = `
       Uptime: ${uptimePercent}% | Current streak: ${streakText} ${currentStatus}
     `;
+    
+    // Update downtime count
+    if (this.downtimeCount) {
+      const outages = status.totalOutages || 0;
+      const totalDowntime = this.formatDuration(status.totalDownSeconds);
+      this.downtimeCount.textContent = `${outages} outage${outages !== 1 ? 's' : ''} • ${totalDowntime} total downtime`;
+    }
+  }
+
+  updateDowntimeIncidents(status) {
+    if (!this.downtimeSection || !this.incidentsList) return;
+    
+    const incidents = status.downtimeIncidents || [];
+    
+    if (incidents.length === 0) {
+      this.downtimeSection.style.display = 'none';
+      return;
+    }
+    
+    this.downtimeSection.style.display = 'block';
+    
+    this.incidentsList.innerHTML = incidents.map(incident => {
+      const startTime = new Date(incident.startTime);
+      const endTime = new Date(incident.endTime);
+      const duration = this.formatDuration(incident.duration);
+      
+      return `
+        <div class="incident-item">
+          <div class="incident-time">
+            ${this.formatDateTime(startTime)} - ${this.formatDateTime(endTime)}
+          </div>
+          <div class="incident-duration">
+            Downtime: ${duration}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  formatDateTime(date) {
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 
   formatRelativeTime(date) {
@@ -293,5 +458,14 @@ class CSCTStatus {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+  new ThemeManager();
   new CSCTStatus();
+  
+  // Credits button functionality
+  const creditsBtn = document.getElementById('credits-btn');
+  if (creditsBtn) {
+    creditsBtn.addEventListener('click', () => {
+      alert('CSCT Cloud Status Monitor\n\nCreated by:\nEthan & Josh');
+    });
+  }
 });
