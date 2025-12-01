@@ -254,18 +254,20 @@ class CSCTStatus {
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
       fetch(url, {
-        method: 'HEAD',
+        method: 'GET',
         signal: controller.signal,
         mode: 'no-cors'
       })
-        .then(() => {
+        .then((response) => {
           clearTimeout(timeoutId);
           const latency = Date.now() - startTime;
+          // With no-cors mode, we can't check status, but if we get here it connected
           resolve({ isReachable: true, latency });
         })
-        .catch(() => {
+        .catch((error) => {
           clearTimeout(timeoutId);
           const latency = Date.now() - startTime;
+          console.error('HTTPS test error:', error.name, error.message);
           resolve({ isReachable: false, latency });
         });
     });

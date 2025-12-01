@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Simple TCP connection test server
+// TCP connection test server - equivalent to PowerShell Test-NetConnection
 // Returns TCP connectivity status as JSON
 // Run with: node test-connection.js
 
@@ -11,7 +11,7 @@ const TARGET_HOST = 'csctcloud.uwe.ac.uk';
 const TARGET_PORT = 22;
 const SERVER_PORT = 8080;
 
-function testTcpConnection() {
+function testNetConnection() {
   return new Promise((resolve) => {
     const startTime = Date.now();
     const socket = new net.Socket();
@@ -26,7 +26,7 @@ function testTcpConnection() {
         latency,
         host: TARGET_HOST,
         port: TARGET_PORT,
-        message: 'Connection succeeded'
+        message: 'TcpTestSucceeded'
       });
     });
     
@@ -72,10 +72,10 @@ const server = http.createServer(async (req, res) => {
   
   if (req.url === '/test' && req.method === 'GET') {
     try {
-      const result = await testTcpConnection();
+      const result = await testNetConnection();
       res.writeHead(200);
       res.end(JSON.stringify(result));
-      console.log(`[${new Date().toISOString()}] Test result: ${result.success ? 'SUCCESS' : 'FAILED'} - Latency: ${result.latency}ms`);
+      console.log(`[${new Date().toISOString()}] Test-NetConnection result: ${result.success ? 'SUCCESS' : 'FAILED'} - Latency: ${result.latency}ms`);
     } catch (error) {
       res.writeHead(500);
       res.end(JSON.stringify({ success: false, message: error.message }));
@@ -87,7 +87,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(SERVER_PORT, () => {
-  console.log(`TCP test server running on http://localhost:${SERVER_PORT}`);
+  console.log(`Test-NetConnection server running on http://localhost:${SERVER_PORT}`);
   console.log(`Testing connectivity to ${TARGET_HOST}:${TARGET_PORT}`);
   console.log(`Endpoint: GET /test`);
 });
