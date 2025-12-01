@@ -1,11 +1,9 @@
 {
   "lastOnline": null,
-  "lastStatus": "unknown",
-  "lastStatusChange": null,
+  "lastStatus": "offline",
+  "lastStatusChange": "2025-12-01T16:09:57.573Z",
   "currentStreakSeconds": 0,
   "totalUpSeconds": 0,
   "totalDownSeconds": 0,
-  "lastChecked": null
+  "lastChecked": "2025-12-01T16:09:57.573Z"
 }
-
-
