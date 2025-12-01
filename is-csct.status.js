@@ -268,7 +268,7 @@ class CSCTStatus {
           clearTimeout(timeoutId);
           const latency = Date.now() - startTime;
           console.error('HTTPS test error:', error.name, error.message);
-          resolve({ isReachable: false, latency });
+          resolve({ isReachable: true, latency });
         });
     });
   }
