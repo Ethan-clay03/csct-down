@@ -103,13 +103,10 @@ class CSCTStatus {
     // Load initial status from localStorage
     this.loadStoredStatus();
     
-    // Auto-refresh every 3 minutes (180 seconds)
-    setInterval(() => this.loadStatus(), 180000);
-    
     // Poll server connectivity every 15 minutes (900000ms) - only once
     setInterval(() => this.checkServerStatus(), 900000);
     
-    // Also do initial check immediately
+    // Also do initial check immediately on page load
     this.checkServerStatus();
   }
 
