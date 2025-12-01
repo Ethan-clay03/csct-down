@@ -234,7 +234,15 @@ class CSCTStatus {
     } catch (error) {
       // If backend is not running, fall back to HTTPS test
       console.warn('Backend endpoint not available, falling back to HTTPS test:', error.message);
-      return await this.testHttpsConnection('https://csctcloud.uwe.ac.uk/', 5000);
+      const httpsResult = await this.testHttpsConnection('https://csctcloud.uwe.ac.uk/', 5000);
+      // Convert HTTPS result format to match TCP test format
+      return {
+        success: httpsResult.isReachable,
+        latency: httpsResult.latency,
+        host: 'csctcloud.uwe.ac.uk',
+        port: 443,
+        message: httpsResult.isReachable ? 'HTTPS reachable' : 'HTTPS unreachable'
+      };
     }
   }
 
