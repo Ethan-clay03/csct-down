@@ -187,11 +187,11 @@ class CSCTStatus {
     const prevStatus = this.getStoredStatus();
     
     try {
-      // Test TCP connection to port 22 (SSH) - equivalent to Test-NetConnection
-      const result = await this.testNetConnection('csctcloud.uwe.ac.uk', 22, 5000);
+      // Test TCP connection via backend endpoint
+      const result = await this.testTcpConnection();
       
-      if (result.tcpTestSucceeded) {
-        // Port 22 is reachable
+      if (result.success) {
+        // Server is reachable on port 22
         const isOnline = true;
         const newStatus = this.computeDurations(prevStatus, now, isOnline);
         newStatus.latency = result.latency;
@@ -201,7 +201,7 @@ class CSCTStatus {
         this.updateUI(newStatus);
         console.log(`[${now.toISOString()}] Port 22 test succeeded - latency: ${result.latency}ms`);
       } else {
-        throw new Error('Port 22 test failed');
+        throw new Error('Port 22 test failed: ' + result.message);
       }
     } catch (error) {
       // Server is offline or request failed
@@ -217,41 +217,49 @@ class CSCTStatus {
     }
   }
 
-  // TCP connection test - equivalent to PowerShell Test-NetConnection
-  testNetConnection(host, port, timeout = 5000) {
-    return new Promise((resolve, reject) => {
+  // Call backend TCP test endpoint
+  async testTcpConnection() {
+    try {
+      const response = await fetch('http://localhost:8080/test', {
+        method: 'GET',
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      // If backend is not running, fall back to HTTPS test
+      console.warn('Backend endpoint not available, falling back to HTTPS test:', error.message);
+      return await this.testHttpsConnection('https://csctcloud.uwe.ac.uk/', 5000);
+    }
+  }
+
+  // HTTPS connection test - check if server is reachable
+  testHttpsConnection(url, timeout = 5000) {
+    return new Promise((resolve) => {
       const startTime = Date.now();
-      const socket = new WebSocket(`wss://${host}:${port}`);
-      let timeoutId;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const cleanup = () => {
-        clearTimeout(timeoutId);
-        socket.close();
-      };
-
-      const handleSuccess = () => {
-        const latency = Date.now() - startTime;
-        cleanup();
-        resolve({ tcpTestSucceeded: true, latency });
-      };
-
-      const handleFailure = (error) => {
-        const latency = Date.now() - startTime;
-        cleanup();
-        resolve({ tcpTestSucceeded: false, latency, error: error.message });
-      };
-
-      socket.onopen = handleSuccess;
-      socket.onerror = handleFailure;
-      socket.onclose = () => {
-        if (timeoutId) {
-          handleFailure(new Error('Connection closed'));
-        }
-      };
-
-      timeoutId = setTimeout(() => {
-        handleFailure(new Error('Connection timeout'));
-      }, timeout);
+      fetch(url, {
+        method: 'HEAD',
+        signal: controller.signal,
+        mode: 'no-cors'
+      })
+        .then(() => {
+          clearTimeout(timeoutId);
+          const latency = Date.now() - startTime;
+          resolve({ isReachable: true, latency });
+        })
+        .catch(() => {
+          clearTimeout(timeoutId);
+          const latency = Date.now() - startTime;
+          resolve({ isReachable: false, latency });
+        });
     });
   }
 
