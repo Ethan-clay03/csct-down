@@ -221,7 +221,7 @@ class CSCTStatus {
   testNetConnection(host, port, timeout = 5000) {
     return new Promise((resolve, reject) => {
       const startTime = Date.now();
-      const socket = new WebSocket(`ws://${host}:${port}`);
+      const socket = new WebSocket(`wss://${host}:${port}`);
       let timeoutId;
 
       const cleanup = () => {
