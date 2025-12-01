@@ -101,14 +101,23 @@ class CSCTStatus {
   }
 
   init() {
-    // Load initial status
-    this.loadStatus();
+    // Load initial status from localStorage
+    this.loadStoredStatus();
     
     // Set up refresh button
     this.refreshBtn.addEventListener('click', () => this.handleRefresh());
     
-    // Auto-refresh every 60 seconds
-    setInterval(() => this.loadStatus(), 60000);
+    // Poll server connectivity every 15 minutes (900000ms) - only once
+    setInterval(() => this.checkServerStatus(), 900000);
+    
+    // Also do initial check immediately
+    this.checkServerStatus();
+  }
+
+  loadStoredStatus() {
+    // Load and display stored status without pinging
+    const status = this.getStoredStatus();
+    this.updateUI(status);
   }
 
   getStoredStatus() {
@@ -140,11 +149,6 @@ class CSCTStatus {
     } catch (error) {
       console.warn('Failed to save status to localStorage:', error);
     }
-  }
-
-  async loadStatus() {
-    // For static sites, we'll check the status directly
-    await this.checkServerStatus();
   }
 
   async handleRefresh() {
@@ -187,41 +191,72 @@ class CSCTStatus {
     const prevStatus = this.getStoredStatus();
     
     try {
-      // Use a simple fetch with a timeout to check if server is responsive
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      // Test TCP connection to port 22 (SSH) - equivalent to Test-NetConnection
+      const result = await this.testNetConnection('csctcloud.uwe.ac.uk', 22, 5000);
       
-      const startTime = Date.now();
-      
-      // Try to fetch the main page
-      const response = await fetch('https://csctcloud.uwe.ac.uk/', {
-        method: 'HEAD', // Use HEAD to minimize data transfer
-        signal: controller.signal,
-        mode: 'no-cors' // Allow cross-origin requests
-      });
-      
-      clearTimeout(timeoutId);
-      const endTime = Date.now();
-      const latency = endTime - startTime;
-      
-      // For no-cors mode, we can't read the response, but if we get here without error, server responded
-      const isOnline = true;
-      const newStatus = this.computeDurations(prevStatus, now, isOnline);
-      newStatus.latency = latency;
-      
-      this.saveStatus(newStatus);
-      this.updateUI(newStatus);
-      
+      if (result.tcpTestSucceeded) {
+        // Port 22 is reachable
+        const isOnline = true;
+        const newStatus = this.computeDurations(prevStatus, now, isOnline);
+        newStatus.latency = result.latency;
+        newStatus.portTest = { port: 22, succeeded: true };
+        
+        this.saveStatus(newStatus);
+        this.updateUI(newStatus);
+        console.log(`[${now.toISOString()}] Port 22 test succeeded - latency: ${result.latency}ms`);
+      } else {
+        throw new Error('Port 22 test failed');
+      }
     } catch (error) {
       // Server is offline or request failed
       const isOnline = false;
       const newStatus = this.computeDurations(prevStatus, now, isOnline);
       newStatus.latency = null;
-      newStatus.error = error.name === 'AbortError' ? 'timeout' : 'connection failed';
+      newStatus.error = error.message || 'connection failed';
+      newStatus.portTest = { port: 22, succeeded: false };
       
       this.saveStatus(newStatus);
       this.updateUI(newStatus);
+      console.log(`[${now.toISOString()}] Port 22 test failed - ${error.message}`);
     }
+  }
+
+  // TCP connection test - equivalent to PowerShell Test-NetConnection
+  testNetConnection(host, port, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      const socket = new WebSocket(`ws://${host}:${port}`);
+      let timeoutId;
+
+      const cleanup = () => {
+        clearTimeout(timeoutId);
+        socket.close();
+      };
+
+      const handleSuccess = () => {
+        const latency = Date.now() - startTime;
+        cleanup();
+        resolve({ tcpTestSucceeded: true, latency });
+      };
+
+      const handleFailure = (error) => {
+        const latency = Date.now() - startTime;
+        cleanup();
+        resolve({ tcpTestSucceeded: false, latency, error: error.message });
+      };
+
+      socket.onopen = handleSuccess;
+      socket.onerror = handleFailure;
+      socket.onclose = () => {
+        if (timeoutId) {
+          handleFailure(new Error('Connection closed'));
+        }
+      };
+
+      timeoutId = setTimeout(() => {
+        handleFailure(new Error('Connection timeout'));
+      }, timeout);
+    });
   }
 
   computeDurations(prevStatus, now, isOnline) {
