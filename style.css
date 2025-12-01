@@ -436,10 +436,6 @@ body {
 .status-footer {
   padding: 24px 32px 32px;
   border-top: 1px solid var(--color-border-secondary);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
 }
 
 .uptime-info {
@@ -457,46 +453,6 @@ body {
   font-size: 13px;
   color: var(--color-text-tertiary);
   margin-top: 4px;
-}
-
-.refresh-btn {
-  background: var(--color-button-primary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  padding: 12px 20px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.refresh-btn:hover {
-  background: var(--color-button-primary-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.refresh-btn:active {
-  transform: translateY(0);
-}
-
-.refresh-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.refresh-btn svg {
-  transition: transform 0.3s ease;
-}
-
-.refresh-btn:hover svg {
-  transform: rotate(180deg);
 }
 
 /* Responsive design */
@@ -532,9 +488,6 @@ body {
   
   .status-footer {
     padding: 20px 24px 24px;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
   }
   
   .status-title {
@@ -566,11 +519,6 @@ body {
   .status-footer {
     padding: 16px 20px 20px;
   }
-  
-  .refresh-btn {
-    align-self: stretch;
-    justify-content: center;
-  }
 }
 
 /* Accessibility */
@@ -588,8 +536,7 @@ body {
 
 /* Focus styles */
 .credits-btn:focus-visible,
-.theme-toggle:focus-visible,
-.refresh-btn:focus-visible {
+.theme-toggle:focus-visible {
   outline: 2px solid var(--color-button-primary);
   outline-offset: 2px;
 }
