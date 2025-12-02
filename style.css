@@ -455,6 +455,25 @@ body {
   margin-top: 4px;
 }
 
+.deadline-info {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border-secondary);
+}
+
+.deadline-timer {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-status-offline);
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  letter-spacing: 0.3px;
+}
+
+.deadline-timer.deadline-passed {
+  color: var(--color-text-tertiary);
+  opacity: 0.6;
+}
+
 /* Responsive design */
 @media (max-width: 640px) {
   body {

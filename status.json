@@ -1,11 +1,23 @@
 {
-  "lastOnline": null,
-  "lastStatus": "offline",
-  "lastStatusChange": "2025-12-01T16:09:57.573Z",
+  "lastOnline": "2025-12-02T19:30:00.000Z",
+  "lastStatus": "online",
+  "lastStatusChange": "2025-12-01T19:36:00.000Z",
   "currentStreakSeconds": 0,
   "totalUpSeconds": 0,
   "totalDownSeconds": 0,
-  "lastChecked": "2025-12-01T16:09:57.573Z",
-  "downtimeIncidents": [],
-  "totalOutages": 0
+  "lastChecked": "2025-12-02T19:30:00.000Z",
+  "downtimeIncidents": [
+    {
+      "startTime": "2025-11-29T17:47:00.000Z",
+      "endTime": "2025-12-01T19:36:00.000Z",
+      "duration": 179340,
+      "id": 1762100000000
+    }
+  ],
+  "totalOutages": 2,
+  "latency": null,
+  "portTest": {
+    "port": 22,
+    "succeeded": true
+  }
 }

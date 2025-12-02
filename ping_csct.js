@@ -1,4 +1,4 @@
-// Simple backend script to ping csctcloud.uwe.ac.uk and update status.json
+// Backend script to test SSH connectivity to csctcloud.uwe.ac.uk:22 and update status.json
 //
 // Usage (from repo root):
 //   node ping_csct.js
@@ -6,12 +6,12 @@
 // You can run this on a schedule (e.g. cron / scheduled task) to keep
 // status.json up to date for the frontend.
 
-const https = require('https');
+const net = require('net');
 const fs = require('fs');
 const path = require('path');
 
 const TARGET_HOST = 'csctcloud.uwe.ac.uk';
-const TARGET_PATH = '/';
+const TARGET_PORT = 22;
 const STATUS_FILE = path.join(__dirname, 'status.json');
 const TIMEOUT_MS = 5000;
 
@@ -111,30 +111,27 @@ function computeDurations(prevStatus, now, isOnline) {
 
 function pingHost() {
   return new Promise((resolve) => {
-    const req = https.request(
-      {
-        host: TARGET_HOST,
-        path: TARGET_PATH,
-        method: 'GET',
-        timeout: TIMEOUT_MS
-      },
-      (res) => {
-        const online = res.statusCode >= 200 && res.statusCode < 500;
-        // We don't need the body, just the response status
-        res.resume();
-        resolve({ online, error: null });
-      }
-    );
-
-    req.on('timeout', () => {
-      req.destroy(new Error('Request timed out'));
+    const socket = new net.Socket();
+    const startTime = Date.now();
+    
+    socket.setTimeout(TIMEOUT_MS);
+    
+    socket.on('connect', () => {
+      const latency = Date.now() - startTime;
+      socket.destroy();
+      resolve({ online: true, latency, error: null });
     });
-
-    req.on('error', (err) => {
-      resolve({ online: false, error: err.message || 'network error' });
+    
+    socket.on('timeout', () => {
+      socket.destroy(new Error('Connection timed out'));
+      resolve({ online: false, latency: null, error: 'timeout' });
     });
-
-    req.end();
+    
+    socket.on('error', (err) => {
+      resolve({ online: false, latency: null, error: err.message || 'connection refused' });
+    });
+    
+    socket.connect(TARGET_PORT, TARGET_HOST);
   });
 }
 
@@ -142,16 +139,22 @@ async function main() {
   const now = new Date();
   const prevStatus = readStatusFile();
 
-  const { online, error } = await pingHost();
+  const { online, latency, error } = await pingHost();
   const nextStatus = computeDurations(prevStatus, now, online);
+  
+  if (latency !== null) {
+    nextStatus.latency = latency;
+  }
+  nextStatus.portTest = { port: TARGET_PORT, succeeded: online };
 
   writeStatusFile(nextStatus);
 
   // Simple log for when run manually
   const summary = online ? 'ONLINE' : 'OFFLINE';
+  const latencyStr = latency !== null ? ` (${latency}ms)` : '';
   console.log(
-    `[${now.toISOString()}] csctcloud.uwe.ac.uk is ${summary}` +
-      (error ? ` (${error})` : '')
+    `[${now.toISOString()}] SSH test on ${TARGET_HOST}:${TARGET_PORT} is ${summary}${latencyStr}` +
+      (error ? ` - ${error}` : '')
   );
   console.log(
     `Last up: ${nextStatus.lastOnline || 'never'} | ` +
