@@ -417,15 +417,12 @@ class CSCTStatus {
       this.statusDot.classList.add('online');
       this.statusTextMain.classList.add('online');
       this.statusTextMain.textContent = 'CSCT Cloud is online';
-      this.statusDetail.innerHTML = 'SSH connection to <code>csctcloud.uwe.ac.uk:22</code> is responding normally.';
     } else if (isOffline) {
       this.statusDot.classList.add('offline');
       this.statusTextMain.classList.add('offline');
       this.statusTextMain.textContent = 'CSCT Cloud is offline';
-      this.statusDetail.innerHTML = 'SSH connection to <code>csctcloud.uwe.ac.uk:22</code> is not responding.';
     } else {
       this.statusTextMain.textContent = 'Checking status...';
-      this.statusDetail.innerHTML = 'Checking SSH connection to <code>csctcloud.uwe.ac.uk:22</code>';
     }
 
     // Update meta information
@@ -502,7 +499,6 @@ class CSCTStatus {
 
   updateUptimeSummary(status) {
     if (status.totalUpSeconds === 0 && status.totalDownSeconds === 0) {
-      this.uptimeSummary.textContent = 'Monitoring will begin after first check.';
       if (this.downtimeCount) {
         this.downtimeCount.textContent = '';
       }
