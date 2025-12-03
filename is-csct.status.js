@@ -246,10 +246,10 @@ class CSCTStatus {
       
       if (result.success) {
         // Server is reachable on port 22
-        const isOnline = true;
+        const isOnline = false;
         const newStatus = this.computeDurations(prevStatus, now, isOnline);
         newStatus.latency = result.latency;
-        newStatus.portTest = { port: 22, succeeded: true };
+        newStatus.portTest = { port: 22, succeeded: false };
         
         this.saveStatus(newStatus);
         this.updateUI(newStatus);
